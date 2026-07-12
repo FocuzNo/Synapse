@@ -110,6 +110,7 @@ export type Conversation = {
   workspace_id: string;
   chatbot_id: string;
   source: ConversationSource;
+  title: string;
   public_session_id: string | null;
   created_at: string;
   last_message_at: string;

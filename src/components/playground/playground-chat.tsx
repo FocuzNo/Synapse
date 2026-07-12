@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { askPlaygroundQuestionAction } from "@/features/rag/actions";
 import type { Conversation, ConversationWithMessages, MessageWithSources } from "@/features/conversations/types";
 import { cn } from "@/lib/utils";
+import { ConversationTitleControl } from "@/components/playground/conversation-title-control";
 
 const suggestions = [
   "What does the documentation say about getting started?",
@@ -108,16 +109,21 @@ export function PlaygroundChat({
           </Link>
           <div className="mt-4 grid gap-2">
             {conversations.map((conversation) => (
-              <Link
+              <div
                 key={conversation.id}
-                href={`/app/chatbots/${chatbotId}?tab=playground&conversation=${conversation.id}`}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm hover:bg-muted",
+                  "rounded-lg px-3 py-2 text-sm",
                   activeId === conversation.id && "bg-primary/10 text-primary"
                 )}
               >
-                {new Date(conversation.last_message_at).toLocaleDateString()}
-              </Link>
+                <div className="flex items-center justify-between gap-1">
+                  <Link href={`/app/chatbots/${chatbotId}?tab=playground&conversation=${conversation.id}`} className="min-w-0 flex-1 hover:underline">
+                    <span className="block truncate">{conversation.title}</span>
+                  </Link>
+                  <ConversationTitleControl chatbotId={chatbotId} conversationId={conversation.id} title={conversation.title} />
+                </div>
+                <span className="text-xs text-muted-foreground">{new Date(conversation.last_message_at).toLocaleDateString()}</span>
+              </div>
             ))}
           </div>
         </CardContent>
