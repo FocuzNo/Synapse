@@ -1,5 +1,7 @@
 # AskFlow Studio
 
+[![AskFlow CI](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/ci.yml)
+
 AskFlow Studio is a production-shaped SaaS MVP for building support chatbots from company documents. The current codebase includes tenant-aware auth, chatbot CRUD, TXT knowledge ingestion, vector retrieval, grounded answers, source persistence, and conversation history.
 
 This repository is ready for local development and live Supabase verification. No mock auth or mock AI flow is used.
@@ -254,6 +256,29 @@ Deploy the repository root as a Next.js project in Vercel. The required environm
 Configure Production and Preview values separately in Vercel. After the first production deployment, set `NEXT_PUBLIC_APP_URL` to the final HTTPS domain and redeploy. In Supabase Auth URL Configuration, set the same domain as Site URL and add `/auth/callback`; keep `http://localhost:3000/auth/callback` for local development. Do not add wildcard redirects unless the preview strategy requires a narrowly scoped pattern.
 
 Before recording the demo, check `/`, `/pricing`, `/demo`, `/widget.js`, `/privacy`, `/terms`, `/robots.txt`, the protected dashboard, and the public widget. Never add `.env.local` or provider keys to git.
+
+## GitHub Actions
+
+The credential-free `AskFlow CI` workflow runs tests, lint, strict typecheck, and build on pull requests and pushes to `main` and `dev`. It uses Node.js 20 and `npm ci`; it does not call Supabase, OpenRouter, or deploy anything.
+
+The separate `AskFlow Integration Check` workflow is manual-only. It requires a GitHub Environment named `integration` with these secrets configured manually:
+
+- `NEXT_PUBLIC_APP_URL`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `OPENROUTER_API_KEY`
+- `OPENROUTER_CHAT_MODEL`
+- `OPENROUTER_EMBEDDING_MODEL`
+- `OPENROUTER_EMBEDDING_DIMENSIONS`
+- `PUBLIC_RATE_LIMIT_SALT`
+- `NEXT_PUBLIC_DEMO_CHATBOT_PUBLIC_ID` (optional for the current verifier)
+
+Secret values are never printed by the workflow. Integration checks are intentionally not run on pull requests, including fork pull requests.
+
+### Recommended GitHub branch protection
+
+For `main`, require a pull request, require the `AskFlow CI / quality` check, require branches to be up to date, block force pushes, and block branch deletion. These repository settings should be enabled manually by a repository administrator.
 
 ## Current Verification Status
 

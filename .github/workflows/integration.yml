@@ -1,0 +1,64 @@
+name: AskFlow Integration Check
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: integration
+    env:
+      NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_CHAT_MODEL: ${{ secrets.OPENROUTER_CHAT_MODEL }}
+      OPENROUTER_EMBEDDING_MODEL: ${{ secrets.OPENROUTER_EMBEDDING_MODEL }}
+      OPENROUTER_EMBEDDING_DIMENSIONS: ${{ secrets.OPENROUTER_EMBEDDING_DIMENSIONS }}
+      PUBLIC_RATE_LIMIT_SALT: ${{ secrets.PUBLIC_RATE_LIMIT_SALT }}
+      NEXT_PUBLIC_DEMO_CHATBOT_PUBLIC_ID: ${{ secrets.NEXT_PUBLIC_DEMO_CHATBOT_PUBLIC_ID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate required integration configuration
+        shell: bash
+        run: |
+          required=(
+            NEXT_PUBLIC_APP_URL
+            NEXT_PUBLIC_SUPABASE_URL
+            NEXT_PUBLIC_SUPABASE_ANON_KEY
+            SUPABASE_SERVICE_ROLE_KEY
+            OPENROUTER_API_KEY
+            OPENROUTER_CHAT_MODEL
+            OPENROUTER_EMBEDDING_MODEL
+            OPENROUTER_EMBEDDING_DIMENSIONS
+            PUBLIC_RATE_LIMIT_SALT
+          )
+          for name in "${required[@]}"; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "Missing required integration secret: ${name}" >&2
+              exit 1
+            fi
+          done
+
+      - name: Verify Supabase integration
+        run: npm run verify:integrations
+
+      - name: Verify OpenRouter integration
+        run: npm run verify:integrations -- --check-openrouter
