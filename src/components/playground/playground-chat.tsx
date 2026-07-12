@@ -97,6 +97,7 @@ export function PlaygroundChat({
         })),
       },
     ]);
+    router.replace(`/app/chatbots/${chatbotId}?tab=playground&conversation=${result.data.conversationId}`);
     router.refresh();
   }
 
@@ -120,7 +121,7 @@ export function PlaygroundChat({
                   <Link href={`/app/chatbots/${chatbotId}?tab=playground&conversation=${conversation.id}`} className="min-w-0 flex-1 hover:underline">
                     <span className="block truncate">{conversation.title}</span>
                   </Link>
-                  <ConversationTitleControl chatbotId={chatbotId} conversationId={conversation.id} title={conversation.title} />
+                  <ConversationTitleControl key={`${conversation.id}-${conversation.title}`} chatbotId={chatbotId} conversationId={conversation.id} title={conversation.title} />
                 </div>
                 <span className="text-xs text-muted-foreground">{new Date(conversation.last_message_at).toLocaleDateString()}</span>
               </div>

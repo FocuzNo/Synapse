@@ -170,6 +170,7 @@ export default async function ChatbotDetailPage({
 
       {activeTab === "playground" ? (
         <PlaygroundChat
+          key={query.conversation ?? "new-conversation"}
           chatbotId={chatbot.id}
           hasReadyDocuments={readyDocumentCount > 0}
           conversations={conversations}
