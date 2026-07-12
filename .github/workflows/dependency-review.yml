@@ -1,0 +1,26 @@
+name: AskFlow Dependency Review
+
+on:
+  pull_request:
+    branches: [main, dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Review dependency changes
+        continue-on-error: true
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+      - name: Dependency review availability notice
+        if: failure()
+        run: |
+          echo "Dependency Review is unavailable until Dependency graph and GitHub Advanced Security are enabled."
+          echo "Enable them in Settings > Security > Code security and analysis, then remove continue-on-error from this workflow."

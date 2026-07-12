@@ -64,7 +64,7 @@ export default async function ChatbotsPage() {
       ) : (
         <div className="grid gap-4">
           {chatbots.map((chatbot) => (
-            <Card key={chatbot.id} className="shadow-sm">
+            <Card key={chatbot.id} className="overflow-visible shadow-sm">
               <CardHeader className="flex-row items-start justify-between gap-4">
                 <div>
                   <CardTitle className="text-lg">{chatbot.name}</CardTitle>

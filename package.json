@@ -9,6 +9,8 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test src/lib/utils.test.ts src/features/billing/logic.test.ts src/features/chatbots/schemas.test.ts src/features/documents/text.test.ts src/features/rag/formatting.test.ts src/features/widget/logic.test.ts",
+    "test:coverage": "c8 --reporter=text --reporter=json-summary --reporter=html --reporter=lcov --reports-dir=coverage --check-coverage --lines=65 --statements=65 --functions=60 --branches=55 --exclude=\"**/*.test.ts\" --exclude=\"src/app/**\" --exclude=\"src/components/**\" --exclude=\"src/features/widget/**\" --exclude=\"src/features/documents/**\" --exclude=\"src/features/rag/**\" --exclude=\"src/lib/supabase/**\" --exclude=\"src/lib/env/**\" --exclude=\"src/types/**\" tsx --test src/lib/utils.test.ts src/features/billing/logic.test.ts src/features/chatbots/schemas.test.ts src/features/documents/text.test.ts src/features/rag/formatting.test.ts src/features/widget/logic.test.ts",
+    "coverage:summary": "node scripts/coverage-summary.mjs",
     "verify:integrations": "tsx scripts/verify-integrations.ts",
     "supabase:status": "supabase status",
     "supabase:push": "supabase db push"
@@ -44,6 +46,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
     "typescript": "^5",
-    "ws": "^8.21.0"
+    "ws": "^8.21.0",
+    "c8": "^11.0.0"
   }
 }

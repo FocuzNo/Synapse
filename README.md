@@ -1,6 +1,8 @@
 # AskFlow Studio
 
 [![AskFlow CI](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/ci.yml/badge.svg)](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/ci.yml)
+[![AskFlow Coverage](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/coverage.yml/badge.svg)](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/coverage.yml)
+[![AskFlow CodeQL](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/codeql.yml/badge.svg)](https://github.com/FocuzNo/AskFlow-Studio/actions/workflows/codeql.yml)
 
 AskFlow Studio is a production-shaped SaaS MVP for building support chatbots from company documents. The current codebase includes tenant-aware auth, chatbot CRUD, TXT knowledge ingestion, vector retrieval, grounded answers, source persistence, and conversation history.
 
@@ -127,6 +129,7 @@ Static checks:
 
 ```bash
 npm run test
+npm run test:coverage
 npm run lint
 npm run typecheck
 npm run build
@@ -155,6 +158,19 @@ What `verify:integrations` checks:
 - optional live OpenRouter embedding and non-streaming chat calls
 
 It does not create or mutate production data.
+
+## Security And Quality Automation
+
+GitHub Actions are intentionally limited to repository checks; there is no deployment workflow and no provider secret is required by these checks.
+
+- `ci.yml` runs the existing Node `tsx --test` suite, lint, strict typecheck, and production build on pull requests targeting `main` or `dev` and on pushes to those branches.
+- `coverage.yml` runs the same test runner through `c8` for focused business-logic coverage. It emits text, JSON summary, HTML, and LCOV reports and uploads `askflow-coverage-report` for 7 days. Current minimum gates are statements 65%, lines 65%, functions 60%, and branches 55%; the latest local run was 91.82%, 91.82%, 78.46%, and 86.51% respectively.
+- `dependency-review.yml` reviews pull-request dependency changes and fails on high severity findings.
+- `codeql.yml` runs the official CodeQL JavaScript/TypeScript analysis on `main` and `dev` pull requests and pushes, weekly, or manually.
+- `.github/dependabot.yml` checks npm updates weekly and groups patch/minor updates.
+- `integration.yml` remains manual-only because it requires GitHub environment secrets for Supabase and OpenRouter.
+
+These workflows improve automated feedback but are not a claim that the application is fully secure. Review dependency, CodeQL, and coverage findings before merging.
 
 ## Demo Fixture
 
