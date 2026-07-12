@@ -45,7 +45,7 @@
     "supabase": "^2.109.1",
     "tailwindcss": "^4",
     "tsx": "^4.23.0",
-    "typescript": "^5",
+    "typescript": "^7",
     "ws": "^8.21.0",
     "c8": "^11.0.0"
   }
