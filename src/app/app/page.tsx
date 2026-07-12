@@ -10,6 +10,8 @@ import { StatusBadge } from "@/components/chatbots/status-badge";
 import { requireUser } from "@/features/auth/server";
 import { getCurrentWorkspace } from "@/features/workspaces/server";
 import { getChatbotsForCurrentWorkspace } from "@/features/chatbots/queries";
+import { getReadyDocumentCount } from "@/features/documents/queries";
+import { hasAssistantResponseForChatbot } from "@/features/conversations/queries";
 
 const checklist = [
   { label: "Account created", done: true },
@@ -33,6 +35,12 @@ export default async function AppOverviewPage() {
     "there";
 
   const hasChatbot = chatbots.length > 0;
+  const [readyDocumentCount, hasAssistantResponse] = hasChatbot
+    ? await Promise.all([
+        getReadyDocumentCount(chatbots[0].id),
+        hasAssistantResponseForChatbot(chatbots[0].id),
+      ])
+    : [0, false];
 
   return (
     <section className="space-y-6">
@@ -99,7 +107,14 @@ export default async function AppOverviewPage() {
         <CardContent>
           <ul className="grid gap-3 text-sm">
             {checklist.map((item) => {
-              const done = item.label === "Create chatbot" ? hasChatbot : item.done;
+              const done =
+                item.label === "Create chatbot"
+                  ? hasChatbot
+                  : item.label === "Upload knowledge"
+                    ? readyDocumentCount > 0
+                    : item.label === "Test assistant"
+                      ? hasAssistantResponse
+                      : item.done;
               return (
               <li key={item.label} className="flex items-center gap-2">
                 {done ? (
