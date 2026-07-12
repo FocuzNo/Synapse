@@ -161,6 +161,7 @@ export async function askPlaygroundQuestionAction(input: unknown): Promise<Actio
         workspace_id: chatbot.workspace_id,
         chatbot_id: chatbot.id,
         source: "playground",
+        title: "New conversation",
       })
       .select("id")
       .single()

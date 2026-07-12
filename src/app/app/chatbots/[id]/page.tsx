@@ -190,7 +190,7 @@ export default async function ChatbotDetailPage({
               <Card key={conversation.id} className="shadow-sm">
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
-                    <p className="font-medium">Playground conversation</p>
+                    <p className="font-medium">{conversation.title}</p>
                     <p className="text-sm text-muted-foreground">
                       Last message{" "}
                       {new Intl.DateTimeFormat("en", {

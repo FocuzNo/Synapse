@@ -18,7 +18,7 @@ export async function getConversationsForChatbot(chatbotId: string): Promise<Con
   const plan = await getWorkspacePlan();
   const { data, error } = await supabase
     .from("conversations")
-    .select("id,workspace_id,chatbot_id,source,public_session_id,created_at,last_message_at")
+    .select("id,workspace_id,chatbot_id,source,title,public_session_id,created_at,last_message_at")
     .eq("workspace_id", chatbot.workspace_id)
     .eq("chatbot_id", chatbot.id)
     .eq("source", "playground")
@@ -53,7 +53,7 @@ export async function getConversationWithMessages(
   const supabase = await createServerSupabaseClient();
   const { data: conversation, error } = await supabase
     .from("conversations")
-    .select("id,workspace_id,chatbot_id,source,public_session_id,created_at,last_message_at")
+    .select("id,workspace_id,chatbot_id,source,title,public_session_id,created_at,last_message_at")
     .eq("id", conversationId)
     .eq("workspace_id", chatbot.workspace_id)
     .eq("chatbot_id", chatbot.id)
