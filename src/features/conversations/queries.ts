@@ -23,6 +23,7 @@ export async function getConversationsForChatbot(chatbotId: string): Promise<Con
     .eq("chatbot_id", chatbot.id)
     .eq("source", "playground")
     .order("last_message_at", { ascending: false })
+    .limit(50)
     .returns<Conversation[]>();
 
   if (error) {
