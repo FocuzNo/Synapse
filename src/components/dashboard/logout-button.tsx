@@ -13,7 +13,14 @@ export function LogoutButton() {
 
   async function handleLogout() {
     setIsLoggingOut(true);
-    const supabase = createBrowserSupabaseClient();
+    let supabase: ReturnType<typeof createBrowserSupabaseClient>;
+    try {
+      supabase = createBrowserSupabaseClient();
+    } catch {
+      setIsLoggingOut(false);
+      toast.error("AskFlow is not configured. Add the Supabase client variables to .env.local and restart the dev server.");
+      return;
+    }
     const { error } = await supabase.auth.signOut();
 
     if (error) {

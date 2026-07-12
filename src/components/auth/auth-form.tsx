@@ -91,9 +91,19 @@ export function AuthForm({ mode }: AuthFormProps) {
     return "Authentication failed. Please check your details and try again.";
   }
 
+  function getClientConfigurationError() {
+    return "AskFlow is not configured for this environment. Add NEXT_PUBLIC_APP_URL, NEXT_PUBLIC_SUPABASE_URL, and NEXT_PUBLIC_SUPABASE_ANON_KEY to .env.local, then restart the dev server.";
+  }
+
   async function handleLogin(values: LoginValues) {
     setAuthError(null);
-    const supabase = createBrowserSupabaseClient();
+    let supabase: ReturnType<typeof createBrowserSupabaseClient>;
+    try {
+      supabase = createBrowserSupabaseClient();
+    } catch {
+      setAuthError(getClientConfigurationError());
+      return;
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email: values.email,
       password: values.password,
@@ -112,7 +122,13 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   async function handleSignup(values: SignupValues) {
     setAuthError(null);
-    const supabase = createBrowserSupabaseClient();
+    let supabase: ReturnType<typeof createBrowserSupabaseClient>;
+    try {
+      supabase = createBrowserSupabaseClient();
+    } catch {
+      setAuthError(getClientConfigurationError());
+      return;
+    }
     const origin = window.location.origin;
     const { data, error } = await supabase.auth.signUp({
       email: values.email,
