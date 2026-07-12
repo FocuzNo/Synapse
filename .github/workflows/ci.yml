@@ -7,32 +7,39 @@ on:
     branches: [main, dev]
   workflow_dispatch:
 
+concurrency:
+  group: askflow-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   quality:
+    name: quality
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+
       - name: Install dependencies
         run: npm ci
-      - name: Test
+
+      - name: Run tests
         run: npm run test
-      - name: Lint
+
+      - name: Run lint
         run: npm run lint
-      - name: Typecheck
+
+      - name: Run typecheck
         run: npm run typecheck
-      - name: Build
+
+      - name: Build application
         run: npm run build
