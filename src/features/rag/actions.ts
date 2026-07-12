@@ -19,6 +19,7 @@ import {
 } from "@/features/rag/constants";
 import type { ActionErrorCode, ActionResult } from "@/features/chatbots/types";
 import type { RetrievedSource } from "@/features/rag/retrieval";
+import { buildConversationTitle, FALLBACK_CONVERSATION_TITLE } from "@/features/conversations/title";
 
 const askQuestionSchema = z.object({
   chatbotId: z.uuid(),
@@ -187,6 +188,20 @@ export async function askPlaygroundQuestionAction(input: unknown): Promise<Actio
   if (userMessageError) {
     console.error("Failed to save user message", { code: userMessageError.code, conversationId });
     return actionError("DATABASE_ERROR", "Message could not be saved.");
+  }
+
+  if (!parsed.data.conversationId) {
+    const { error: titleError } = await supabase
+      .from("conversations")
+      .update({ title: buildConversationTitle(question) })
+      .eq("id", conversationId)
+      .eq("workspace_id", chatbot.workspace_id)
+      .eq("chatbot_id", chatbot.id)
+      .eq("title", FALLBACK_CONVERSATION_TITLE);
+
+    if (titleError) {
+      console.error("Failed to set conversation title", { code: titleError.code, chatbotId: chatbot.id });
+    }
   }
 
   let sources: RetrievedSource[] = [];

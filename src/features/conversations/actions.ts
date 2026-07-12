@@ -9,7 +9,7 @@ import type { ActionResult } from "@/features/chatbots/types";
 const renameConversationSchema = z.object({
   chatbotId: z.uuid(),
   conversationId: z.uuid(),
-  title: z.string().trim().min(1, "Enter a conversation name.").max(120, "Name is too long."),
+  title: z.string().trim().min(1, "Enter a conversation name.").max(80, "Name is too long."),
 });
 
 export async function renameConversationAction(input: unknown): Promise<ActionResult<{ title: string }>> {
