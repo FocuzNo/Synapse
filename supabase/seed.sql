@@ -1,0 +1,2 @@
+-- Seed data is intentionally empty for the foundation milestone.
+-- Real tenant data will be created through authenticated product flows.

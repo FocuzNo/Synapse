@@ -1,0 +1,3 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = { title: "Privacy" };
+export default function PrivacyPage() { return <main className="mx-auto max-w-3xl px-4 py-16 sm:px-6"><h1 className="text-4xl font-semibold">Privacy</h1><p className="mt-4 text-muted-foreground">AskFlow is an MVP demonstration. Uploaded knowledge and conversations are stored in the configured Supabase project for the workspace that owns them. The demo may send document context and questions to a third-party AI provider to generate answers. Do not upload confidential production data.</p><p className="mt-4 text-muted-foreground">This page is a concise demo notice, not legal advice or a complete production privacy policy.</p></main>; }
