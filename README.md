@@ -48,17 +48,24 @@ Not implemented in this milestone:
 
 ## Local Setup
 
-Install dependencies:
+### 1. Install the project
 
-```bash
+Use Node.js 22 or later, then run:
+
+```powershell
+cd D:\AskFlow-Studio
 npm install
 ```
 
-Create local env:
+### 2. Create `.env.local`
 
-```bash
-cp .env.example .env.local
+Copy the template:
+
+```powershell
+Copy-Item .env.example .env.local
 ```
+
+Open `.env.local` and replace the empty values. Do not add quotes unless the value itself requires them, and never paste these values into source code or GitHub issues.
 
 Required variables:
 
@@ -77,22 +84,75 @@ PUBLIC_RATE_LIMIT_SALT=
 
 Do not commit `.env.local`. Secrets must remain server-only.
 
+If `.env.local` is missing or a client variable is empty, the login and signup forms show a setup message instead of a runtime error. Restart `npm run dev` after changing environment variables.
+
 ## Supabase Project Setup
 
-1. Create a Supabase project.
-2. Copy the project URL into `NEXT_PUBLIC_SUPABASE_URL`.
-3. Copy the anon key into `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-4. Copy the service role key into `SUPABASE_SERVICE_ROLE_KEY`.
-5. In Supabase Auth URL Configuration, set:
+1. Open [Supabase](https://supabase.com/dashboard) and create a project.
+2. Open **Project Settings -> API**.
+3. Copy **Project URL** into `NEXT_PUBLIC_SUPABASE_URL`.
+4. Copy the publishable/anon key into `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+5. Copy the service role key into `SUPABASE_SERVICE_ROLE_KEY`. This is server-only and must never use the `NEXT_PUBLIC_` prefix.
+6. Open **Authentication -> Providers** and enable Email.
+7. Open **Authentication -> URL Configuration** and set:
 
 ```text
 Site URL: http://localhost:3000
 Redirect URL: http://localhost:3000/auth/callback
 ```
 
-6. Enable email/password auth.
-7. For the current development project, keep Confirm Email disabled unless you specifically want to test the callback flow.
-8. Decide whether email confirmation should stay enabled:
+8. For local development, disable Confirm email if you want signup to create a session immediately. With confirmation enabled, the user must open the email link and return through `/auth/callback`.
+
+### 3. Configure OpenRouter
+
+Create an inference key in [OpenRouter](https://openrouter.ai/), then add it only to `.env.local`:
+
+```env
+OPENROUTER_API_KEY=your-server-only-key
+OPENROUTER_CHAT_MODEL=google/gemma-4-26b-a4b-it:free
+OPENROUTER_EMBEDDING_MODEL=openai/text-embedding-3-small
+OPENROUTER_EMBEDDING_DIMENSIONS=1536
+```
+
+The chat model is used for grounded answers. The embedding model is used for document and query embeddings. The API key is never imported into Client Components.
+
+### 4. Link and migrate Supabase
+
+Install or run the Supabase CLI through `npx`, authenticate, and link the repository to your project:
+
+```powershell
+npx supabase login
+npx supabase projects list
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push
+```
+
+Run migrations from the repository root. Do not edit an already-applied migration; create a new migration for corrections. The migrations create the extensions, tenant tables, chatbot/RAG tables, private `knowledge-files` bucket, widget foundation, billing foundation, and conversation title constraints.
+
+If Docker is not installed, `supabase db push` can still apply migrations, but the CLI may print a local migration-cache warning. The remote migration result is the source of truth.
+
+### 5. Start and verify
+
+```powershell
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000), create an account, create a chatbot, upload `fixtures/clouddesk-knowledge.txt`, and test the Playground. Then run:
+
+```powershell
+npm run verify:integrations
+npm run verify:integrations -- --check-openrouter
+```
+
+The verifier checks configuration, Supabase tables/RPCs/Storage, and optionally OpenRouter. It does not print secret values or create test records.
+
+For GitHub Actions, add the same server values as repository/environment secrets under **Settings -> Secrets and variables -> Actions**. Integration workflow secrets are:
+
+`NEXT_PUBLIC_APP_URL`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `OPENROUTER_CHAT_MODEL`, `OPENROUTER_EMBEDDING_MODEL`, `OPENROUTER_EMBEDDING_DIMENSIONS`, `PUBLIC_RATE_LIMIT_SALT`, and `NEXT_PUBLIC_DEMO_CHATBOT_PUBLIC_ID`.
+
+Never add `.env.local`, Supabase service-role keys, or OpenRouter keys to a commit.
+
+Email confirmation behavior:
 
 - Enabled: signup shows a confirmation state until the email link is used.
 - Disabled: signup creates a session immediately and redirects into `/app`.
@@ -118,6 +178,8 @@ Current migrations:
 8. `20260712150000_create_subscriptions.sql`
 9. `20260712151000_add_usage_record_read_policy.sql`
 10. `20260712152000_lock_subscription_mutations.sql`
+11. `20260712170000_add_conversation_titles.sql`
+12. `20260712171500_limit_conversation_title_length.sql`
 
 If CLI is unavailable, run the migration files in order through the Supabase SQL Editor.
 
