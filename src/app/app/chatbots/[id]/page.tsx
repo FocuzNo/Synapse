@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Bot, Code2, Database, MessagesSquare } from "lucide-react";
+import { Bot, Database, MessagesSquare } from "lucide-react";
+import { getServerEnv } from "@/lib/env/server";
 import { ChatbotAppearanceForm } from "@/components/chatbots/chatbot-appearance-form";
 import { ChatbotGeneralForm } from "@/components/chatbots/chatbot-general-form";
+import { InstallSnippetCard } from "@/components/chatbots/install-snippet-card";
 import { ChatbotStatusActions } from "@/components/chatbots/chatbot-status-actions";
 import { DeleteChatbotButton } from "@/components/chatbots/delete-chatbot-button";
 import { StatusBadge } from "@/components/chatbots/status-badge";
@@ -12,6 +14,7 @@ import { KnowledgeUploadForm } from "@/components/documents/knowledge-panel";
 import { PlaygroundChat } from "@/components/playground/playground-chat";
 import { EmptyState } from "@/components/shared/empty-state";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getWorkspacePlanLimits } from "@/features/billing/server";
 import { getChatbotById } from "@/features/chatbots/queries";
 import { getConversationWithMessages, getConversationsForChatbot } from "@/features/conversations/queries";
 import { getDocumentsForChatbot, getReadyDocumentCount } from "@/features/documents/queries";
@@ -51,6 +54,7 @@ export default async function ChatbotDetailPage({
 
   const activeTab = getTab(query.tab);
   const readyDocumentCount = await getReadyDocumentCount(chatbot.id);
+  const planLimits = await getWorkspacePlanLimits();
   const documents = activeTab === "knowledge" ? await getDocumentsForChatbot(chatbot.id) : [];
   const conversations =
     activeTab === "playground" || activeTab === "conversations"
@@ -60,6 +64,8 @@ export default async function ChatbotDetailPage({
     activeTab === "playground"
       ? await getConversationWithMessages(chatbot.id, query.conversation ?? null)
       : null;
+  const appUrl = getServerEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+  const embedCode = `<script\n  src="${appUrl}/widget.js"\n  data-chatbot-id="${chatbot.public_id}"\n  async>\n</script>`;
 
   return (
     <section className="space-y-6">
@@ -115,7 +121,12 @@ export default async function ChatbotDetailPage({
         </>
       ) : null}
 
-      {activeTab === "appearance" ? <ChatbotAppearanceForm chatbot={chatbot} /> : null}
+      {activeTab === "appearance" ? (
+        <ChatbotAppearanceForm
+          chatbot={chatbot}
+          canRemoveBranding={planLimits.brandingRemoval}
+        />
+      ) : null}
 
       {activeTab === "knowledge" ? (
         <div className="space-y-4">
@@ -198,21 +209,13 @@ export default async function ChatbotDetailPage({
       ) : null}
 
       {activeTab === "install" ? (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Code2 className="size-5" />
-              Install
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Embed code will become available in the widget milestone. This
-              chatbot already has a non-sequential public ID reserved for that
-              future flow.
-            </p>
-          </CardContent>
-        </Card>
+        <InstallSnippetCard
+          chatbotPublicId={chatbot.public_id}
+          chatbotStatus={chatbot.status}
+          hasReadyDocuments={readyDocumentCount > 0}
+          appUrl={appUrl}
+          embedCode={embedCode}
+        />
       ) : null}
     </section>
   );

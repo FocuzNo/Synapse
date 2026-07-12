@@ -2,6 +2,6 @@
 -- for primary keys in later migrations.
 create extension if not exists "pgcrypto";
 
--- pgvector stores OpenAI embedding vectors and enables similarity search for
+-- pgvector stores embedding vectors and enables similarity search for
 -- workspace- and chatbot-scoped RAG retrieval.
 create extension if not exists "vector";

@@ -4,6 +4,24 @@ import { PROTECTED_ROUTE_PREFIX } from "@/lib/constants";
 import { updateSupabaseSession } from "@/lib/supabase/middleware";
 import { getSafeNextPath } from "@/lib/utils";
 
+function applySecurityHeaders(request: NextRequest, response: NextResponse) {
+  const { pathname } = request.nextUrl;
+  const isEmbedRoute = pathname.startsWith("/embed/");
+
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+
+  if (isEmbedRoute) {
+    response.headers.set("Content-Security-Policy", "frame-ancestors *");
+    response.headers.delete("X-Frame-Options");
+    return response;
+  }
+
+  response.headers.set("Content-Security-Policy", "frame-ancestors 'none'");
+  response.headers.set("X-Frame-Options", "DENY");
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isProtectedRoute =
@@ -11,12 +29,16 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith(`${PROTECTED_ROUTE_PREFIX}/`);
 
   if (!isProtectedRoute) {
+    if (pathname.startsWith("/embed/")) {
+      return applySecurityHeaders(request, NextResponse.next());
+    }
+
     if (!hasClientEnv()) {
-      return NextResponse.next();
+      return applySecurityHeaders(request, NextResponse.next());
     }
 
     const { response } = await updateSupabaseSession(request);
-    return response;
+    return applySecurityHeaders(request, response);
   }
 
   if (!hasClientEnv()) {
@@ -25,7 +47,7 @@ export async function proxy(request: NextRequest) {
       "next",
       getSafeNextPath(`${pathname}${request.nextUrl.search}`) ?? "/app"
     );
-    return NextResponse.redirect(redirectUrl);
+    return applySecurityHeaders(request, NextResponse.redirect(redirectUrl));
   }
 
   const { response, user } = await updateSupabaseSession(request);
@@ -36,14 +58,14 @@ export async function proxy(request: NextRequest) {
       "next",
       getSafeNextPath(`${pathname}${request.nextUrl.search}`) ?? "/app"
     );
-    return NextResponse.redirect(redirectUrl);
+    return applySecurityHeaders(request, NextResponse.redirect(redirectUrl));
   }
 
-  return response;
+  return applySecurityHeaders(request, response);
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$|embed).*)",
+    "/((?!_next/static|_next/image|favicon.ico|widget\\.js|api/public|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bot, CreditCard, Home, Menu, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -22,6 +23,8 @@ type DashboardShellProps = {
   userName: string;
   userEmail: string;
   workspaceName: string;
+  planLabel: string;
+  usageLabel?: string;
 };
 
 function DashboardNav() {
@@ -57,6 +60,8 @@ export function DashboardShell({
   userName,
   userEmail,
   workspaceName,
+  planLabel,
+  usageLabel,
 }: DashboardShellProps) {
   const initials = userName
     .split(" ")
@@ -97,7 +102,12 @@ export function DashboardShell({
             </Sheet>
             <div>
               <p className="text-sm font-medium">{workspaceName}</p>
-              <p className="text-xs text-muted-foreground">Free plan</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <Badge variant="secondary">{planLabel}</Badge>
+                {usageLabel ? (
+                  <p className="text-xs text-muted-foreground">{usageLabel}</p>
+                ) : null}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">

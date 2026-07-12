@@ -83,7 +83,7 @@ export async function recoverCurrentUserWorkspace(user: User): Promise<void> {
     ? user.user_metadata.full_name.trim()
     : "";
 
-  await admin.from("profiles").upsert(
+  const { error: profileError } = await admin.from("profiles").upsert(
     {
       id: user.id,
       email: user.email ?? "",
@@ -91,6 +91,14 @@ export async function recoverCurrentUserWorkspace(user: User): Promise<void> {
     },
     { onConflict: "id" }
   );
+
+  if (profileError) {
+    console.error("Workspace recovery profile upsert failed", {
+      code: profileError.code,
+      userId: user.id,
+    });
+    throw new Error("Unable to recover profile.");
+  }
 
   const { data: workspace, error: workspaceError } = await admin
     .from("workspaces")
@@ -106,10 +114,14 @@ export async function recoverCurrentUserWorkspace(user: User): Promise<void> {
     .returns<{ id: string }>();
 
   if (workspaceError || !workspace) {
+    console.error("Workspace recovery workspace upsert failed", {
+      code: workspaceError?.code,
+      userId: user.id,
+    });
     throw new Error("Unable to recover workspace.");
   }
 
-  await admin.from("workspace_members").upsert(
+  const { error: membershipError } = await admin.from("workspace_members").upsert(
     {
       workspace_id: workspace.id,
       user_id: user.id,
@@ -117,4 +129,13 @@ export async function recoverCurrentUserWorkspace(user: User): Promise<void> {
     },
     { onConflict: "workspace_id,user_id" }
   );
+
+  if (membershipError) {
+    console.error("Workspace recovery membership upsert failed", {
+      code: membershipError.code,
+      userId: user.id,
+      workspaceId: workspace.id,
+    });
+    throw new Error("Unable to recover workspace membership.");
+  }
 }

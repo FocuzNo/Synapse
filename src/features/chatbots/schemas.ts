@@ -31,6 +31,7 @@ export const chatbotAppearanceSchema = z.object({
   primaryColor: hexColorSchema,
   theme: z.enum(["light", "dark"]),
   position: z.enum(["bottom-right", "bottom-left"]),
+  brandingEnabled: z.boolean(),
 });
 
 export const chatbotStatusSchema = z.object({

@@ -84,6 +84,10 @@ export function AuthForm({ mode }: AuthFormProps) {
       return "An account with this email may already exist. Try signing in instead.";
     }
 
+    if (normalized.includes("rate limit")) {
+      return "Signup email sending is temporarily rate-limited. Wait a moment or disable email confirmation for the development project.";
+    }
+
     return "Authentication failed. Please check your details and try again.";
   }
 

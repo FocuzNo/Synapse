@@ -16,7 +16,8 @@ export function sanitizeFilename(filename: string) {
     .replace(/[^\w.\- ]+/g, "")
     .trim()
     .replace(/\s+/g, "-")
-    .toLowerCase();
+    .toLowerCase()
+    .slice(0, 120);
 
   if (!normalized.endsWith(".txt")) {
     return `${normalized || "document"}.txt`;
@@ -25,11 +26,30 @@ export function sanitizeFilename(filename: string) {
   return normalized || "document.txt";
 }
 
+function containsBinaryContent(bytes: Uint8Array) {
+  let suspiciousControlBytes = 0;
+
+  for (const byte of bytes) {
+    if (byte === 0) {
+      return true;
+    }
+
+    const isAllowedWhitespace = byte === 9 || byte === 10 || byte === 13;
+    const isPrintableAscii = byte >= 32 && byte <= 126;
+    const isUtf8ContinuationOrLead = byte >= 128;
+
+    if (!isAllowedWhitespace && !isPrintableAscii && !isUtf8ContinuationOrLead) {
+      suspiciousControlBytes += 1;
+    }
+  }
+
+  return suspiciousControlBytes > 0;
+}
+
 export function normalizeTxtBuffer(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
-  const nullBytes = bytes.filter((byte) => byte === 0).length;
 
-  if (nullBytes > 0) {
+  if (containsBinaryContent(bytes)) {
     throw new Error("File appears to contain binary data.");
   }
 

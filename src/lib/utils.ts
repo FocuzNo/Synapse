@@ -10,5 +10,9 @@ export function getSafeNextPath(value: string | null) {
     return null
   }
 
+  if (/[\\\r\n\t]/.test(value)) {
+    return null
+  }
+
   return value
 }

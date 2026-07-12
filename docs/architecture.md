@@ -1,230 +1,220 @@
 # AskFlow Architecture
 
-## Repository Assessment
+## Current State
 
-Current state:
+The repository now contains a real Next.js application with:
 
-- Next.js App Router application is initialized in the repository root.
-- Supabase Auth, profile/workspace schema, chatbot schema, RLS, and dashboard shell exist.
-- Chatbot CRUD and onboarding are implemented.
-- Document upload, embeddings, RAG chat, conversations, widget API, billing, and analytics are still deferred.
+- Supabase SSR auth clients
+- tenant schema and RLS
+- chatbot CRUD
+- TXT knowledge ingestion
+- pgvector retrieval
+- grounded playground answers
+- conversation persistence
+- public iframe widget foundation
+- subscription foundation with centralized Free, Starter, and Pro entitlements
+- server-side feature gates and mock billing flow
+- production-shaped marketing and env-driven public demo surfaces
 
-The architecture below remains the target structure for the production-quality MVP iterations.
+This document reflects the actual code path, not the original greenfield plan.
 
-## Proposed Folder Structure
+## Runtime Flow
 
-```text
-.
-├── app
-│   ├── (auth)
-│   │   ├── login
-│   │   └── signup
-│   ├── (marketing)
-│   │   ├── page.tsx
-│   │   ├── pricing
-│   │   └── demo
-│   ├── app
-│   │   ├── layout.tsx
-│   │   ├── page.tsx
-│   │   ├── onboarding
-│   │   ├── chatbots
-│   │   │   ├── page.tsx
-│   │   │   └── [id]
-│   │   │       ├── page.tsx
-│   │   │       ├── playground
-│   │   │       ├── knowledge
-│   │   │       ├── conversations
-│   │   │       ├── analytics
-│   │   │       ├── appearance
-│   │   │       └── install
-│   │   ├── billing
-│   │   └── settings
-│   ├── api
-│   │   ├── documents
-│   │   │   ├── upload
-│   │   │   └── process
-│   │   ├── chat
-│   │   ├── embed
-│   │   └── billing
-│   ├── embed
-│   │   └── [publicId]
-│   ├── layout.tsx
-│   └── globals.css
-├── components
-│   ├── app-shell
-│   ├── chat
-│   ├── documents
-│   ├── forms
-│   ├── marketing
-│   └── ui
-├── lib
-│   ├── auth
-│   ├── billing
-│   ├── documents
-│   ├── embeddings
-│   ├── limits
-│   ├── openai
-│   ├── rag
-│   ├── supabase
-│   ├── validation
-│   └── utils.ts
-├── middleware.ts
-├── supabase
-│   ├── migrations
-│   └── seed.sql
-├── docs
-└── public
-```
+Current end-to-end flow in code:
+
+1. User signs up with email, password, `full_name`, and `company_name`.
+2. Supabase Auth trigger `handle_new_user()` creates:
+
+- `profiles`
+- `workspaces`
+- `workspace_members`
+
+3. User logs in through password auth.
+4. Protected routes are gated by the request proxy and by server-side `/app` layout checks.
+5. User creates a chatbot in the current workspace.
+6. User uploads a TXT file to the chatbot Knowledge tab.
+7. A `documents` row is created as `processing`.
+8. The original file is uploaded into private Storage bucket `knowledge-files`.
+9. TXT content is normalized and chunked server-side.
+10. OpenRouter embeddings are created with `openai/text-embedding-3-small`.
+11. Chunks are stored in `document_chunks`.
+12. Document status is updated to `ready`.
+13. Playground stores the user message.
+14. The query is embedded and sent to `match_document_chunks`.
+15. Relevant chunks are filtered by workspace, chatbot, and ready-document status.
+16. If context is sufficient, the chat model generates a grounded answer.
+17. Assistant message and source references are persisted.
+18. Conversation history is reloaded from Supabase on refresh.
+19. Public widget loader `/widget.js` mounts an isolated iframe from `/embed/[publicId]`.
+20. Anonymous widget chat resolves the chatbot by `public_id`, applies DB-backed rate limits, reuses shared retrieval/generation logic, and stores `source = 'widget'` conversations.
+21. Public widget history reloads by reading the same `public_session_id` from browser storage and fetching a public-safe message list.
+22. Billing reads the workspace subscription (falling back to Free), exposes usage summaries, and applies plan gates before mutations and AI usage.
+23. The public demo reads `NEXT_PUBLIC_DEMO_CHATBOT_PUBLIC_ID` at request time and mounts the existing public widget without exposing internal identifiers or secrets.
 
 ## Data Model
 
-Core entity chain:
+Entity chain:
 
 ```text
-Workspace -> Chatbots -> Documents -> Document Chunks -> Conversations -> Messages -> Sources
+workspace -> chatbots -> documents -> document_chunks -> conversations -> messages -> message_sources
 ```
 
-Every tenant-specific table includes `workspace_id`. Search over embeddings must always filter by `workspace_id` and `chatbot_id`.
+Core tables:
 
-## Proposed Database Schema
+- `profiles`
+- `workspaces`
+- `workspace_members`
+- `chatbots`
+- `documents`
+- `document_chunks`
+- `conversations`
+- `messages`
+- `message_sources`
+- `public_chat_rate_limits`
+- `usage_records`
+- `subscriptions`
 
-### `workspaces`
+Storage bucket:
 
-- `id uuid primary key default gen_random_uuid()`
-- `owner_id uuid not null references auth.users(id) on delete cascade`
-- `name text not null`
-- `plan text not null default 'free'`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
+- `knowledge-files` (private)
 
-### `chatbots`
+RPC:
 
-- `id uuid primary key default gen_random_uuid()`
-- `workspace_id uuid not null references workspaces(id) on delete cascade`
-- `public_id uuid not null default gen_random_uuid()`
-- `name text not null`
-- `description text`
-- `welcome_message text not null default 'Hi! How can I help you today?'`
-- `system_prompt text not null`
-- `status text not null default 'draft'`
-- `theme text not null default 'light'`
-- `primary_color text not null default '#6D5DFB'`
-- `position text not null default 'bottom-right'`
-- `branding_enabled boolean not null default true`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
+- `match_document_chunks`
+- `check_public_chat_rate_limit`
+- `consume_workspace_ai_usage`
+- `set_updated_at` (shared by tenant, chatbot, and subscription records)
 
-Status values: `draft`, `active`, `disabled`.
-Theme values: `light`, `dark`.
-Position values: `bottom-right`, `bottom-left`.
-Free plan workspaces must keep `branding_enabled = true`.
+## Tenant Isolation
 
-### `documents`
+Isolation strategy:
 
-- `id uuid primary key default gen_random_uuid()`
-- `workspace_id uuid not null references workspaces(id) on delete cascade`
-- `chatbot_id uuid not null references chatbots(id) on delete cascade`
-- `name text not null`
-- `storage_path text not null`
-- `mime_type text not null`
-- `size_bytes integer not null`
-- `status text not null default 'uploaded'`
-- `error_message text`
-- `created_at timestamptz not null default now()`
-- `processed_at timestamptz`
+- `profiles` are readable and updatable only by the owning user.
+- `workspaces` and `workspace_members` use helper functions based on `auth.uid()`.
+- `chatbots`, `documents`, and `conversations` are scoped by workspace membership.
+- writes to chatbot and document management routes additionally require `owner` or `admin`.
+- vector search requires both `workspace_id` and `chatbot_id`.
+- billing gates derive the workspace from the authenticated session and never trust client-supplied tenant identifiers.
 
-Statuses: `uploaded`, `processing`, `processed`, `failed`.
+Current query helpers never trust `workspace_id` from the client. Workspace context is derived from the authenticated session.
 
-### `document_chunks`
+## Admin Client Usage
 
-- `id uuid primary key default gen_random_uuid()`
-- `workspace_id uuid not null references workspaces(id) on delete cascade`
-- `chatbot_id uuid not null references chatbots(id) on delete cascade`
-- `document_id uuid not null references documents(id) on delete cascade`
-- `chunk_index integer not null`
-- `content text not null`
-- `token_count integer`
-- `embedding vector(1536) not null`
-- `created_at timestamptz not null default now()`
+The admin client is intentionally limited to privileged infrastructure operations:
 
-The `1536` dimension matches OpenAI `text-embedding-3-small`.
+- workspace recovery for legacy or broken accounts
+- inserting `document_chunks`
+- inserting `message_sources`
+- anonymous public widget conversation and usage writes that cannot rely on authenticated RLS
 
-TXT ingestion uses synchronous server-side processing for files up to 2 MB:
+Rationale:
 
-1. Create `documents` row as `processing`.
-2. Upload the original file to private `knowledge-files` Storage.
-3. Decode UTF-8 text, normalize whitespace, and preserve paragraph boundaries.
-4. Chunk deterministically around 1200 characters with overlap.
-5. Create embeddings with `text-embedding-3-small`.
-6. Insert chunks and update the document to `ready`.
-7. On failure, delete inserted chunks, mark document `failed`, and keep the original private file for diagnostics/retry.
+- `document_chunks` and `message_sources` do not expose direct authenticated insert policies today.
+- the app performs tenant checks before every admin write by resolving the chatbot or workspace through the authenticated user first.
 
-Vector search uses `match_document_chunks`, filtered by `workspace_id`, `chatbot_id`, ready documents, and authenticated workspace membership.
+Ordinary CRUD stays on the authenticated Supabase server client.
 
-### `conversations`
+Storage upload and delete now use the authenticated client instead of the admin client so bucket policies remain part of the runtime path.
 
-- `id uuid primary key default gen_random_uuid()`
-- `workspace_id uuid not null references workspaces(id) on delete cascade`
-- `chatbot_id uuid not null references chatbots(id) on delete cascade`
-- `visitor_id text`
-- `channel text not null default 'playground'`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
+Billing uses the authenticated client for normal subscription and usage reads. Public widget usage enforcement uses the admin client only after resolving the workspace from the public chatbot and applying the plan limit server-side.
 
-### `messages`
+## Billing and Feature Gates
 
-- `id uuid primary key default gen_random_uuid()`
-- `workspace_id uuid not null references workspaces(id) on delete cascade`
-- `conversation_id uuid not null references conversations(id) on delete cascade`
-- `role text not null`
-- `content text not null`
-- `created_at timestamptz not null default now()`
+`src/features/billing/plans.ts` is the single source of truth for Free, Starter, and Pro limits. The current subscription provider is `mock` until Stripe is introduced.
 
-Roles: `user`, `assistant`, `system`.
+- Free: 1 chatbot, 5 documents, 2 MB files, 100 monthly AI messages, branding required, 7-day conversation retention
+- Starter: 3 chatbots, 50 documents, 10 MB files, 2,000 monthly AI messages, branding removal, 90-day retention
+- Pro: 10 chatbots, 200 documents, 20 MB files, 10,000 monthly AI messages, branding removal, unlimited retention
 
-### `message_sources`
+Creation, upload, branding, analytics access, monthly usage, and conversation-history retention are enforced in server-only helpers. Mock upgrades apply immediately; downgrades are recorded as a scheduled plan change at period end. No Stripe secrets or checkout behavior are required yet.
 
-- `id uuid primary key default gen_random_uuid()`
-- `workspace_id uuid not null references workspaces(id) on delete cascade`
-- `message_id uuid not null references messages(id) on delete cascade`
-- `document_id uuid not null references documents(id) on delete cascade`
-- `chunk_id uuid not null references document_chunks(id) on delete cascade`
-- `score double precision not null`
-- `created_at timestamptz not null default now()`
+## Consistency Strategy
 
-### `usage_counters`
+### Upload flow
 
-- `id uuid primary key default gen_random_uuid()`
-- `workspace_id uuid not null references workspaces(id) on delete cascade`
-- `period_start date not null`
-- `ai_messages_count integer not null default 0`
-- `created_at timestamptz not null default now()`
-- `updated_at timestamptz not null default now()`
-- unique `workspace_id, period_start`
+Current safeguards:
 
-## RLS Strategy
+- document row starts in `processing`
+- invalid UTF-8 or binary-looking content is rejected
+- embeddings are batched
+- chunk inserts are cleaned up on failure
+- uploaded Storage file is removed on failure when possible
+- failed documents end in `status = 'failed'` with a safe error message
 
-- Users can select and update only workspaces where `owner_id = auth.uid()`.
-- Child tables are accessible only through their parent workspace ownership.
-- Chatbots are readable by workspace members and writable only by `owner` or `admin` members.
-- Public embed access must not bypass tenant scoping; it should resolve `chatbots.public_id`, then use controlled server routes for reads and chat.
-- Service role key is allowed only in server-side document processing paths where elevated access is required.
+Remaining limitation:
 
-## Server Boundaries
+- the flow is still a JavaScript sequence inside one request, not a database transaction or external job.
 
-Client-safe:
+### Answer flow
 
-- Supabase project URL
-- Supabase anon key
-- Non-sensitive UI configuration
+Current safeguards:
 
-Server-only:
+- user message is saved before retrieval
+- if retrieval or model generation fails after that point, a safe assistant fallback is persisted
+- assistant sources are saved best-effort
+- `last_message_at` is updated best-effort and logged safely on failure
+- public widget availability requires `status = 'active'` plus at least one ready document
+- public widget never accepts `workspace_id`, internal chatbot id, or system prompt from the browser
+- public widget stores only a browser-generated `public_session_id` and derives tenant context server-side from `public_id`
+- public widget returns only public-safe config and source DTOs
 
-- Supabase service role key
-- OpenAI API key
-- Stripe secret key
-- Stripe webhook secret
+Remaining limitation:
 
-## Potential Conflicts With Requested Stack
+- message insert, source insert, and timestamp update are not atomic.
 
-No conflicts were found in the repository because no app exists yet. The only planning concern is version drift: current `next` on npm is `16.2.10`, so the implementation should verify shadcn/ui compatibility during setup and pin dependency versions in `package.json`.
+## OpenRouter and Retrieval Settings
+
+Current defaults in code:
+
+- embedding model: `openai/text-embedding-3-small`
+- embedding dimension: `1536`
+- chat model: `google/gemma-4-26b-a4b-it:free`
+- OpenRouter timeout: `30000 ms`
+- OpenRouter retries: `1`
+- embedding batch size: `20`
+- RAG top-k: `5`
+- RAG match threshold: `0.25`
+
+`0.25` is now live-verified as the active public-widget threshold. It successfully separated relevant CloudDesk questions from the irrelevant Amsterdam-weather query in this environment.
+
+## Security Notes
+
+- service-role key remains server-only
+- safe redirect logic rejects non-internal, protocol-relative, and control-character `next` values
+- prompt instructions inside uploaded documents are explicitly treated as untrusted content
+- branding remains forced on for the Free plan server-side
+- subscription plan limits are checked server-side and are not UI-only affordances
+- subscription insert/update privileges are revoked from authenticated clients; mock billing uses a server-only action after session and role validation
+- public widget stores hashed IP-derived rate-limit keys using `PUBLIC_RATE_LIMIT_SALT`
+- `/embed/[publicId]` is explicitly embeddable while dashboard routes send `frame-ancestors 'none'` and `X-Frame-Options: DENY`
+
+## Verified vs Unverified
+
+Verified live against the linked Supabase project:
+
+- migrations applied through `supabase db push`
+- tenant tables, RAG tables, bucket presence, and `match_document_chunks` through `npm run verify:integrations`
+- login, logout, protected redirect, and safe internal redirect handling
+- tenant bootstrap trigger for a fresh user
+- chatbot CRUD up to the point where ready documents are required
+
+Verified locally:
+
+- build, lint, typecheck
+- helper-level tests for filename sanitization, TXT normalization, binary detection, chunking, and safe redirects
+
+Verified live in the current environment:
+
+- OpenRouter embeddings through `openai/text-embedding-3-small`
+- OpenRouter non-streaming chat through `google/gemma-4-26b-a4b-it:free`
+- public widget grounded answers with saved `message_sources`
+- irrelevant fallback without source creation
+- prompt-injection fallback without system-prompt disclosure
+- widget session persistence through `public_session_id`
+- tenant scoping by `public_id` without trusting client tenant overrides
+- billing schema and plan-gate unit tests
+
+Remaining caution:
+
+- the current Slack answer is grounded and correct enough for MVP, but the source ranking is not perfect and may benefit from future retrieval tuning
+- mock billing has no payment processor, webhook synchronization, or real invoice lifecycle

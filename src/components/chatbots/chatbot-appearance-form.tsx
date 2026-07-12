@@ -14,9 +14,10 @@ import { cn } from "@/lib/utils";
 
 type ChatbotAppearanceFormProps = {
   chatbot: Chatbot;
+  canRemoveBranding: boolean;
 };
 
-export function ChatbotAppearanceForm({ chatbot }: ChatbotAppearanceFormProps) {
+export function ChatbotAppearanceForm({ chatbot, canRemoveBranding }: ChatbotAppearanceFormProps) {
   const form = useForm<ChatbotAppearanceInput>({
     resolver: zodResolver(chatbotAppearanceSchema),
     defaultValues: {
@@ -24,12 +25,14 @@ export function ChatbotAppearanceForm({ chatbot }: ChatbotAppearanceFormProps) {
       primaryColor: chatbot.primary_color,
       theme: chatbot.theme,
       position: chatbot.position,
+      brandingEnabled: chatbot.branding_enabled,
     },
   });
   const values = useWatch({ control: form.control });
   const color = values.primaryColor || chatbot.primary_color;
   const theme = values.theme || chatbot.theme;
   const position = values.position || chatbot.position;
+  const brandingEnabled = values.brandingEnabled ?? chatbot.branding_enabled;
 
   async function onSubmit(input: ChatbotAppearanceInput) {
     const result = await updateChatbotAppearanceAction(input);
@@ -80,9 +83,23 @@ export function ChatbotAppearanceForm({ chatbot }: ChatbotAppearanceFormProps) {
                 <option value="bottom-left">Bottom left</option>
               </select>
             </div>
-            <p className="text-sm text-muted-foreground">
-              AskFlow branding remains enabled on Free.
-            </p>
+            <div className="space-y-2">
+              <Label htmlFor="brandingEnabled">Branding</Label>
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
+                <input
+                  id="brandingEnabled"
+                  type="checkbox"
+                  disabled={!canRemoveBranding}
+                  {...form.register("brandingEnabled")}
+                />
+                Show “Powered by AskFlow”
+              </label>
+              <p className="text-sm text-muted-foreground">
+                {canRemoveBranding
+                  ? "Starter and Pro can remove branding."
+                  : "Free keeps AskFlow branding enabled. Upgrade in Billing to remove it."}
+              </p>
+            </div>
             <Button type="submit" disabled={form.formState.isSubmitting}>
               {form.formState.isSubmitting ? "Saving..." : "Save appearance"}
             </Button>
@@ -107,7 +124,7 @@ export function ChatbotAppearanceForm({ chatbot }: ChatbotAppearanceFormProps) {
               <p className={cn("mt-2 text-sm", theme === "dark" ? "text-zinc-300" : "text-muted-foreground")}>
                 {chatbot.welcome_message}
               </p>
-              <div className="mt-3 text-xs opacity-70">Powered by AskFlow</div>
+              {brandingEnabled ? <div className="mt-3 text-xs opacity-70">Powered by AskFlow</div> : null}
             </div>
             <div
               className={cn("absolute bottom-4 flex size-11 items-center justify-center rounded-full text-white shadow", position === "bottom-left" ? "left-4" : "right-4")}

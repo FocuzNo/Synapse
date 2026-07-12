@@ -25,17 +25,23 @@
 *.pem
 
 # debug
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
 # env files (can opt-in for committing if needed)
+.env
+.env.local
+.env.*.local
 .env*
 !.env.example
 
 # vercel
 .vercel
+.supabase/
+Thumbs.db
 
 # typescript
 *.tsbuildinfo

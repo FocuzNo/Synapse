@@ -6,13 +6,22 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/chatbots/status-badge";
 import { ChatbotStatusActions } from "@/components/chatbots/chatbot-status-actions";
 import { DeleteChatbotButton } from "@/components/chatbots/delete-chatbot-button";
-import { getPlanLimits, getWorkspacePlan } from "@/features/billing/plans";
+import { getPlanLabel } from "@/features/billing/plans";
+import { getWorkspaceUsageSummary } from "@/features/billing/server";
 import { getChatbotsForCurrentWorkspace } from "@/features/chatbots/queries";
 
 export default async function ChatbotsPage() {
-  const chatbots = await getChatbotsForCurrentWorkspace();
-  const plan = getWorkspacePlan();
-  const limits = getPlanLimits(plan);
+  const [chatbots, usageSummary] = await Promise.all([
+    getChatbotsForCurrentWorkspace(),
+    getWorkspaceUsageSummary(),
+  ]);
+  const limits = usageSummary?.limits ?? {
+    maxChatbots: 1,
+    maxDocuments: 5,
+    maxMonthlyMessages: 100,
+    maxFileSizeMb: 2,
+  };
+  const plan = usageSummary?.plan ?? "free";
   const atLimit = chatbots.length >= limits.maxChatbots;
 
   return (
@@ -21,12 +30,12 @@ export default async function ChatbotsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Chatbots</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {chatbots.length} of {limits.maxChatbots} chatbots used on the Free plan.
+            {chatbots.length} of {limits.maxChatbots} chatbots used on the {getPlanLabel(plan)} plan.
           </p>
         </div>
         {atLimit ? (
           <div className="rounded-lg border bg-card px-3 py-2 text-sm text-muted-foreground">
-            Free limit reached. Upgrade support comes with billing.
+            Limit reached. Visit Billing to upgrade this workspace.
           </div>
         ) : (
           <Link href="/app/chatbots/new" className={buttonVariants()}>
@@ -40,7 +49,17 @@ export default async function ChatbotsPage() {
           icon={<Bot className="size-6" />}
           title="Create your first chatbot"
           description="Turn your workspace knowledge into a focused support assistant. Knowledge upload is next."
-          action={<Link href="/app/chatbots/new" className={buttonVariants()}>Create chatbot</Link>}
+          action={
+            atLimit ? (
+              <Link href="/app/billing" className={buttonVariants()}>
+                Upgrade workspace
+              </Link>
+            ) : (
+              <Link href="/app/chatbots/new" className={buttonVariants()}>
+                Create chatbot
+              </Link>
+            )
+          }
         />
       ) : (
         <div className="grid gap-4">

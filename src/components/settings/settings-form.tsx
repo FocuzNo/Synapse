@@ -44,6 +44,12 @@ export function SettingsForm({ profile, workspace }: SettingsFormProps) {
       return;
     }
 
+    form.reset({
+      fullName: values.fullName.trim(),
+      workspaceName: values.workspaceName.trim(),
+      website: values.website.trim(),
+      industry: values.industry?.trim() ?? "",
+    });
     toast.success(result.message);
   }
 

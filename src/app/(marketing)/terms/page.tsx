@@ -1,0 +1,3 @@
+import type { Metadata } from "next";
+export const metadata: Metadata = { title: "Terms" };
+export default function TermsPage() { return <main className="mx-auto max-w-3xl px-4 py-16 sm:px-6"><h1 className="text-4xl font-semibold">Terms</h1><p className="mt-4 text-muted-foreground">AskFlow is provided as an evaluation demo with no production SLA. Billing shown in the demo is mock-only and does not charge cards, create invoices, or establish a paid service agreement.</p><p className="mt-4 text-muted-foreground">You are responsible for the content uploaded to a workspace and should use test data while evaluating the product.</p></main>; }

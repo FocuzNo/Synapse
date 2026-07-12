@@ -6,7 +6,10 @@ import { z } from "zod";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireUser } from "@/features/auth/server";
 import { getCurrentWorkspace } from "@/features/workspaces/server";
-import { assertCanCreateChatbot } from "@/features/billing/plans";
+import {
+  assertCanCreateChatbot,
+  assertCanRemoveBranding,
+} from "@/features/billing/server";
 import { DEFAULT_CHATBOT_SYSTEM_PROMPT } from "@/features/chatbots/prompt";
 import {
   chatbotAppearanceSchema,
@@ -71,7 +74,7 @@ export async function createChatbotAction(input: unknown): Promise<ActionResult<
   }
 
   const currentCount = await getChatbotCountForCurrentWorkspace();
-  const limitCheck = assertCanCreateChatbot(currentCount);
+  const limitCheck = await assertCanCreateChatbot(currentCount);
 
   if (!limitCheck.ok) {
     return actionError("PLAN_LIMIT_REACHED", limitCheck.message);
@@ -178,6 +181,18 @@ export async function updateChatbotAppearanceAction(input: unknown): Promise<Act
     return actionError("CHATBOT_NOT_FOUND", "Chatbot was not found.");
   }
 
+  let brandingEnabled = true;
+
+  if (!parsed.data.brandingEnabled) {
+    const brandingGate = await assertCanRemoveBranding();
+
+    if (!brandingGate.ok) {
+      return actionError(brandingGate.code, brandingGate.message);
+    }
+
+    brandingEnabled = false;
+  }
+
   const supabase = await createServerSupabaseClient();
   const { error } = await supabase
     .from("chatbots")
@@ -185,7 +200,7 @@ export async function updateChatbotAppearanceAction(input: unknown): Promise<Act
       primary_color: parsed.data.primaryColor,
       theme: parsed.data.theme,
       position: parsed.data.position,
-      branding_enabled: true,
+      branding_enabled: brandingEnabled,
     })
     .eq("id", existing.id)
     .eq("workspace_id", workspace.workspaceId);

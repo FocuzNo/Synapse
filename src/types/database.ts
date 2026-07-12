@@ -1,4 +1,12 @@
 export type WorkspaceRole = "owner" | "admin" | "member";
+export type PlanKey = "free" | "starter" | "pro";
+export type SubscriptionProvider = "mock" | "stripe";
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled"
+  | "incomplete";
 
 export type Profile = {
   id: string;
@@ -23,6 +31,23 @@ export type WorkspaceMember = {
   user_id: string;
   role: WorkspaceRole;
   created_at: string;
+};
+
+export type Subscription = {
+  id: string;
+  workspace_id: string;
+  provider: SubscriptionProvider;
+  provider_customer_id: string | null;
+  provider_subscription_id: string | null;
+  plan_key: PlanKey;
+  scheduled_plan_key: PlanKey | null;
+  status: SubscriptionStatus;
+  billing_email: string | null;
+  current_period_start: string;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  created_at: string;
+  updated_at: string;
 };
 
 export type ChatbotStatus = "draft" | "active" | "disabled";

@@ -3,12 +3,13 @@ import { Bot, CheckCircle2, Circle } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { getPlanLabel } from "@/features/billing/plans";
+import { getWorkspaceUsageSummary } from "@/features/billing/server";
 import { EmptyState } from "@/components/shared/empty-state";
 import { StatusBadge } from "@/components/chatbots/status-badge";
 import { requireUser } from "@/features/auth/server";
 import { getCurrentWorkspace } from "@/features/workspaces/server";
 import { getChatbotsForCurrentWorkspace } from "@/features/chatbots/queries";
-import { getWorkspacePlan } from "@/features/billing/plans";
 
 const checklist = [
   { label: "Account created", done: true },
@@ -20,9 +21,11 @@ const checklist = [
 
 export default async function AppOverviewPage() {
   const user = await requireUser();
-  const currentWorkspace = await getCurrentWorkspace();
-  const chatbots = await getChatbotsForCurrentWorkspace();
-  const plan = getWorkspacePlan();
+  const [currentWorkspace, chatbots, usageSummary] = await Promise.all([
+    getCurrentWorkspace(),
+    getChatbotsForCurrentWorkspace(),
+    getWorkspaceUsageSummary(),
+  ]);
   const displayName =
     currentWorkspace?.profile.full_name ??
     user.user_metadata.full_name ??
@@ -37,7 +40,7 @@ export default async function AppOverviewPage() {
         <h1 className="text-2xl font-semibold">Welcome, {String(displayName)}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {currentWorkspace
-            ? `${currentWorkspace.workspace.name} is on the Free plan.`
+            ? `${currentWorkspace.workspace.name} is on the ${getPlanLabel(usageSummary?.plan ?? "free")} plan.`
             : "Workspace recovery is available from this protected area."}
         </p>
       </div>
@@ -45,15 +48,22 @@ export default async function AppOverviewPage() {
         <Card className="shadow-sm">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle>Workspace</CardTitle>
-            <Badge variant="secondary">{plan[0].toUpperCase() + plan.slice(1)}</Badge>
+            <Badge variant="secondary">{getPlanLabel(usageSummary?.plan ?? "free")}</Badge>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-3">
             <p className="font-medium">{currentWorkspace.workspace.name}</p>
             <p className="mt-1 text-sm text-muted-foreground">
               {hasChatbot
                 ? "Next action: add knowledge to your assistant."
                 : "Create your first chatbot to continue setup."}
             </p>
+            {usageSummary ? (
+              <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+                <p>{usageSummary.chatbotsUsed} / {usageSummary.limits.maxChatbots} chatbots</p>
+                <p>{usageSummary.documentsUsed} / {usageSummary.limits.maxDocuments} documents</p>
+                <p>{usageSummary.monthlyMessagesUsed} / {usageSummary.limits.maxMonthlyMessages} messages</p>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}
@@ -63,7 +73,9 @@ export default async function AppOverviewPage() {
             <CardTitle>Chatbots</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">{chatbots.length} chatbot created.</p>
+            <p className="text-sm text-muted-foreground">
+              {chatbots.length} chatbot created. Next action: add knowledge to the active assistant.
+            </p>
             <div className="grid gap-3">
               {chatbots.slice(0, 3).map((chatbot) => (
                 <div key={chatbot.id} className="flex items-center justify-between rounded-lg border p-3">

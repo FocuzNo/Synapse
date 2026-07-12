@@ -3,12 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { getOpenAIClient } from "@/lib/openai/client";
+import { getAIClient } from "@/lib/ai/client";
+import { getServerEnv } from "@/lib/env/server";
 import { requireUser } from "@/features/auth/server";
 import { getCurrentWorkspace } from "@/features/workspaces/server";
 import { getChatbotById } from "@/features/chatbots/queries";
-import { assertCanUploadDocument } from "@/features/billing/plans";
-import { EMBEDDING_MODEL, KNOWLEDGE_BUCKET } from "@/features/rag/constants";
+import { assertCanUploadDocument } from "@/features/billing/server";
+import {
+  EMBEDDING_BATCH_SIZE,
+  KNOWLEDGE_BUCKET,
+} from "@/features/rag/constants";
 import { chunkText, normalizeTxtBuffer, sanitizeFilename } from "@/features/documents/text";
 import { getDocumentCountForCurrentWorkspace } from "@/features/documents/queries";
 import type { DocumentActionResult, DocumentErrorCode } from "@/features/documents/types";
@@ -19,6 +23,72 @@ function documentError<T>(code: DocumentErrorCode, message: string): DocumentAct
 
 function isTxtFile(file: File) {
   return file.name.toLowerCase().endsWith(".txt") && (file.type === "text/plain" || file.type === "");
+}
+
+function getDocumentFailureMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "unknown";
+
+  if (message === "INVALID_TEXT_FILE") {
+    return "The file must be valid UTF-8 plain text.";
+  }
+
+  if (message === "NO_TEXT_CHUNKS") {
+    return "The TXT file did not contain usable text chunks.";
+  }
+
+  if (message === "STORAGE_UPLOAD_FAILED") {
+    return "The file could not be uploaded to storage.";
+  }
+
+  if (message === "DOCUMENT_UPDATE_FAILED") {
+    return "The uploaded file could not be linked to the document record.";
+  }
+
+  if (message === "EMBEDDING_COUNT_MISMATCH" || message === "EMBEDDING_DIMENSION_MISMATCH") {
+    return "The embedding response was invalid. Please try again.";
+  }
+
+  if (message === "CHUNK_INSERT_FAILED") {
+    return "Document chunks could not be saved.";
+  }
+
+  if (message === "DOCUMENT_READY_UPDATE_FAILED") {
+    return "The document finished processing, but its final status could not be saved.";
+  }
+
+  if (message.toLowerCase().includes("timeout")) {
+    return "Document processing timed out. Please try a smaller TXT file.";
+  }
+
+  return "Document processing failed. Check that the file is valid UTF-8 text.";
+}
+
+async function createEmbeddingsForChunks(chunks: Array<{ content: string }>) {
+  const env = getServerEnv();
+  const ai = getAIClient();
+  const embeddings: number[][] = [];
+
+  for (let index = 0; index < chunks.length; index += EMBEDDING_BATCH_SIZE) {
+    const batch = chunks.slice(index, index + EMBEDDING_BATCH_SIZE).map((chunk) => chunk.content);
+    const response = await ai.embeddings.create({
+      model: env.OPENROUTER_EMBEDDING_MODEL,
+      input: batch,
+    });
+
+    if (response.data.length !== batch.length) {
+      throw new Error("EMBEDDING_COUNT_MISMATCH");
+    }
+
+    for (const item of response.data) {
+      if (item.embedding.length !== env.OPENROUTER_EMBEDDING_DIMENSIONS) {
+        throw new Error("EMBEDDING_DIMENSION_MISMATCH");
+      }
+
+      embeddings.push(item.embedding);
+    }
+  }
+
+  return embeddings;
 }
 
 async function requireOwnerWorkspace() {
@@ -73,7 +143,7 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
   }
 
   const documentCount = await getDocumentCountForCurrentWorkspace();
-  const limit = assertCanUploadDocument(documentCount, file.size);
+  const limit = await assertCanUploadDocument(documentCount, file.size);
 
   if (!limit.ok) {
     return documentError(limit.code, limit.message);
@@ -105,17 +175,25 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
   }
 
   const storagePath = `${chatbot.workspace_id}/${chatbot.id}/${documentRow.id}/${sanitizedFilename}`;
+  let storageUploaded = false;
 
   try {
     const buffer = await file.arrayBuffer();
-    const text = normalizeTxtBuffer(buffer);
+    let text: string;
+
+    try {
+      text = normalizeTxtBuffer(buffer);
+    } catch {
+      throw new Error("INVALID_TEXT_FILE");
+    }
+
     const chunks = chunkText(text);
 
     if (chunks.length === 0) {
-      throw new Error("No text chunks were produced.");
+      throw new Error("NO_TEXT_CHUNKS");
     }
 
-    const uploadResult = await admin.storage
+    const uploadResult = await supabase.storage
       .from(KNOWLEDGE_BUCKET)
       .upload(storagePath, file, {
         contentType: "text/plain",
@@ -123,20 +201,22 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
       });
 
     if (uploadResult.error) {
-      throw new Error("Storage upload failed.");
+      throw new Error("STORAGE_UPLOAD_FAILED");
     }
 
-    await supabase
+    storageUploaded = true;
+
+    const { error: storagePathError } = await supabase
       .from("documents")
       .update({ storage_path: storagePath })
       .eq("id", documentRow.id)
       .eq("workspace_id", chatbot.workspace_id);
 
-    const openai = getOpenAIClient();
-    const embeddings = await openai.embeddings.create({
-      model: EMBEDDING_MODEL,
-      input: chunks.map((chunk) => chunk.content),
-    });
+    if (storagePathError) {
+      throw new Error("DOCUMENT_UPDATE_FAILED");
+    }
+
+    const embeddings = await createEmbeddingsForChunks(chunks);
 
     const chunkRows = chunks.map((chunk, index) => ({
       workspace_id: chatbot.workspace_id,
@@ -145,7 +225,7 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
       chunk_index: index,
       content: chunk.content,
       token_count: chunk.tokenCount,
-      embedding: embeddings.data[index].embedding,
+      embedding: embeddings[index],
       metadata: {
         originalFilename,
         start: index,
@@ -155,7 +235,7 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
     const { error: chunkError } = await admin.from("document_chunks").insert(chunkRows);
 
     if (chunkError) {
-      throw new Error("Chunk insert failed.");
+      throw new Error("CHUNK_INSERT_FAILED");
     }
 
     const { error: readyError } = await supabase
@@ -170,7 +250,7 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
       .eq("workspace_id", chatbot.workspace_id);
 
     if (readyError) {
-      throw new Error("Document ready update failed.");
+      throw new Error("DOCUMENT_READY_UPDATE_FAILED");
     }
 
     revalidatePath(`/app/chatbots/${chatbot.id}`);
@@ -189,12 +269,17 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
     });
 
     await admin.from("document_chunks").delete().eq("document_id", documentRow.id);
+    if (storageUploaded) {
+      await supabase.storage.from(KNOWLEDGE_BUCKET).remove([storagePath]);
+    }
+
+    const failureMessage = getDocumentFailureMessage(error);
     await supabase
       .from("documents")
       .update({
         status: "failed",
         chunks_count: 0,
-        error_message: "Document processing failed. Check that the file is valid UTF-8 text.",
+        error_message: failureMessage,
         processed_at: new Date().toISOString(),
         storage_path: storagePath,
       })
@@ -203,10 +288,7 @@ export async function uploadTxtDocumentAction(formData: FormData): Promise<Docum
 
     revalidatePath(`/app/chatbots/${chatbot.id}`);
 
-    return documentError(
-      "DOCUMENT_PROCESSING_FAILED",
-      "Document processing failed. Check that the file is valid UTF-8 text."
-    );
+    return documentError("DOCUMENT_PROCESSING_FAILED", failureMessage);
   }
 }
 
@@ -237,8 +319,18 @@ export async function deleteDocumentAction(input: { documentId: string; chatbotI
     return documentError("DATABASE_ERROR", "Document was not found.");
   }
 
-  const admin = createSupabaseAdminClient();
-  await admin.storage.from(KNOWLEDGE_BUCKET).remove([documentRow.storage_path]);
+  const removeResult = await supabase.storage.from(KNOWLEDGE_BUCKET).remove([documentRow.storage_path]);
+
+  if (removeResult.error) {
+    console.error("Failed to delete storage object", {
+      documentId: input.documentId,
+      chatbotId: chatbot.id,
+      workspaceId: chatbot.workspace_id,
+      message: removeResult.error.message,
+    });
+    return documentError("DATABASE_ERROR", "Document file could not be deleted from storage.");
+  }
+
   const { error } = await supabase
     .from("documents")
     .delete()

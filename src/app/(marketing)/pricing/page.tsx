@@ -1,62 +1,32 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { PricingCards } from "@/components/billing/pricing-cards";
 import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-
-const plans = [
-  {
-    name: "Free",
-    price: "$0",
-    features: ["1 chatbot", "5 documents", "2 MB files", "100 AI messages/month"],
-  },
-  {
-    name: "Starter",
-    price: "$19",
-    features: ["3 chatbots", "50 documents", "10 MB files", "2,000 AI messages/month"],
-  },
-];
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen px-4 py-12 sm:px-6">
-      <div className="mx-auto max-w-5xl">
-        <Link href="/" className="text-sm text-muted-foreground hover:text-foreground">
-          AskFlow
-        </Link>
-        <div className="mt-10 max-w-2xl">
-          <h1 className="text-3xl font-semibold sm:text-4xl">Simple MVP pricing</h1>
-          <p className="mt-3 text-muted-foreground">
-            Billing is intentionally deferred. These plans define the limits the
-            server will enforce in later milestones.
+    <main className="min-h-screen bg-background">
+      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
+        <div className="mx-auto max-w-3xl text-center">
+          <h1 className="text-4xl font-semibold tracking-normal sm:text-5xl">
+            Pricing built for the first real support assistant.
+          </h1>
+          <p className="mt-4 text-base leading-7 text-muted-foreground sm:text-lg">
+            Start free, then unlock more chatbots, larger knowledge bases, longer history, and branding controls when your workspace is ready.
           </p>
+          <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+            <Link href="/signup" className={buttonVariants()}>
+              Get started
+            </Link>
+            <Link href="/login" className={buttonVariants({ variant: "outline" })}>
+              Sign in
+            </Link>
+          </div>
         </div>
-        <div className="mt-8 grid gap-4 md:grid-cols-2">
-          {plans.map((plan) => (
-            <Card key={plan.name}>
-              <CardHeader>
-                <CardTitle>{plan.name}</CardTitle>
-                <p className="text-3xl font-semibold">
-                  {plan.price}
-                  <span className="text-sm font-normal text-muted-foreground">/month</span>
-                </p>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-3 text-sm">
-                  {plan.features.map((feature) => (
-                    <li key={feature} className="flex items-center gap-2">
-                      <Check className="size-4 text-primary" />
-                      {feature}
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          ))}
+
+        <div className="mt-12">
+          <PricingCards />
         </div>
-        <Link href="/signup" className={`${buttonVariants()} mt-8`}>
-          Continue to signup
-        </Link>
-      </div>
+      </section>
     </main>
   );
 }

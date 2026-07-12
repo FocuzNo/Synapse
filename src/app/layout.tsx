@@ -20,6 +20,12 @@ export const metadata: Metadata = {
     template: "%s | AskFlow",
   },
   description: "Build AI support chatbots from your company documents.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
+  openGraph: {
+    title: "AskFlow | Grounded AI support assistants",
+    description: "Turn company knowledge into a source-backed AI support assistant.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({

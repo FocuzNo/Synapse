@@ -1,14 +1,23 @@
 import Link from "next/link";
 import { CreateChatbotForm } from "@/components/chatbots/create-chatbot-form";
 import { buttonVariants } from "@/components/ui/button";
+import { getPlanLabel } from "@/features/billing/plans";
+import { getWorkspaceUsageSummary } from "@/features/billing/server";
 import { getCurrentWorkspace } from "@/features/workspaces/server";
 import { getChatbotCountForCurrentWorkspace } from "@/features/chatbots/queries";
-import { getPlanLimits } from "@/features/billing/plans";
 
 export default async function NewChatbotPage() {
-  const currentWorkspace = await getCurrentWorkspace();
-  const count = await getChatbotCountForCurrentWorkspace();
-  const limits = getPlanLimits();
+  const [currentWorkspace, count, usageSummary] = await Promise.all([
+    getCurrentWorkspace(),
+    getChatbotCountForCurrentWorkspace(),
+    getWorkspaceUsageSummary(),
+  ]);
+  const limits = usageSummary?.limits ?? {
+    maxChatbots: 1,
+    maxDocuments: 5,
+    maxMonthlyMessages: 100,
+    maxFileSizeMb: 2,
+  };
   const workspaceName = currentWorkspace?.workspace.name ?? "AskFlow";
 
   if (count >= limits.maxChatbots) {
@@ -16,12 +25,12 @@ export default async function NewChatbotPage() {
       <section className="space-y-4">
         <h1 className="text-2xl font-semibold">Create chatbot</h1>
         <div className="rounded-lg border bg-card p-6">
-          <p className="font-medium">Free plan limit reached</p>
+          <p className="font-medium">Plan limit reached</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            You already use {count} of {limits.maxChatbots} chatbots. Upgrade flow is planned with billing.
+            You already use {count} of {limits.maxChatbots} chatbots on the {getPlanLabel(usageSummary?.plan ?? "free")} plan.
           </p>
-          <Link href="/app/chatbots" className={`${buttonVariants({ variant: "outline" })} mt-4`}>
-            Back to chatbots
+          <Link href="/app/billing" className={`${buttonVariants({ variant: "outline" })} mt-4`}>
+            Open billing
           </Link>
         </div>
       </section>

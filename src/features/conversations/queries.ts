@@ -1,5 +1,9 @@
 import "server-only";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
+import {
+  getWorkspacePlan,
+  isConversationRetainedForPlan,
+} from "@/features/billing/server";
 import { getChatbotById } from "@/features/chatbots/queries";
 import type { Conversation, ConversationWithMessages, MessageWithSources } from "@/features/conversations/types";
 
@@ -11,6 +15,7 @@ export async function getConversationsForChatbot(chatbotId: string): Promise<Con
   }
 
   const supabase = await createServerSupabaseClient();
+  const plan = await getWorkspacePlan();
   const { data, error } = await supabase
     .from("conversations")
     .select("id,workspace_id,chatbot_id,source,public_session_id,created_at,last_message_at")
@@ -25,7 +30,9 @@ export async function getConversationsForChatbot(chatbotId: string): Promise<Con
     return [];
   }
 
-  return data ?? [];
+  return (data ?? []).filter((conversation) =>
+    isConversationRetainedForPlan(plan, conversation.last_message_at)
+  );
 }
 
 export async function getConversationWithMessages(
@@ -42,6 +49,7 @@ export async function getConversationWithMessages(
     return null;
   }
 
+  const plan = await getWorkspacePlan();
   const supabase = await createServerSupabaseClient();
   const { data: conversation, error } = await supabase
     .from("conversations")
@@ -53,6 +61,10 @@ export async function getConversationWithMessages(
     .returns<Conversation | null>();
 
   if (error || !conversation) {
+    return null;
+  }
+
+  if (!isConversationRetainedForPlan(plan, conversation.last_message_at)) {
     return null;
   }
 

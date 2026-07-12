@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Send } from "lucide-react";
@@ -37,19 +37,19 @@ export function PlaygroundChat({
   const [conversationId, setConversationId] = useState(activeConversation?.id ?? null);
   const [messages, setMessages] = useState<MessageWithSources[]>(activeConversation?.messages ?? []);
   const activeId = conversationId ?? activeConversation?.id ?? null;
-  const firstMessages = useMemo(() => {
-    return new Map(conversations.map((conversation) => [conversation.id, conversation]));
-  }, [conversations]);
+  const optimisticIdRef = useRef(0);
 
   async function sendQuestion(value = question) {
     const trimmed = value.trim();
     if (!trimmed || pending || !hasReadyDocuments) return;
 
     setPending(true);
+    optimisticIdRef.current += 1;
+    const optimisticUserId = `local-user-${optimisticIdRef.current}`;
     setMessages((current) => [
       ...current,
       {
-        id: `local-user-${Date.now()}`,
+        id: optimisticUserId,
         conversation_id: conversationId ?? "pending",
         role: "user",
         content: trimmed,
@@ -70,6 +70,8 @@ export function PlaygroundChat({
     setPending(false);
 
     if (!result.ok) {
+      setMessages((current) => current.filter((message) => message.id !== optimisticUserId));
+      setQuestion(trimmed);
       toast.error(result.message);
       return;
     }
@@ -78,7 +80,7 @@ export function PlaygroundChat({
     setMessages((current) => [
       ...current,
       {
-        id: `local-assistant-${Date.now()}`,
+        id: `local-assistant-${optimisticIdRef.current}`,
         conversation_id: result.data.conversationId,
         role: "assistant",
         content: result.data.answer,
@@ -114,9 +116,7 @@ export function PlaygroundChat({
                   activeId === conversation.id && "bg-primary/10 text-primary"
                 )}
               >
-                {firstMessages.get(conversation.id)?.id === conversation.id
-                  ? new Date(conversation.last_message_at).toLocaleDateString()
-                  : "Conversation"}
+                {new Date(conversation.last_message_at).toLocaleDateString()}
               </Link>
             ))}
           </div>
