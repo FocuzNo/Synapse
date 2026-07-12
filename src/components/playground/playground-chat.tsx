@@ -103,7 +103,7 @@ export function PlaygroundChat({
 
   return (
     <div className="grid gap-4 lg:grid-cols-[240px_1fr]">
-      <Card className="shadow-sm">
+      <Card className="min-w-0 overflow-visible shadow-sm">
         <CardContent className="p-3">
           <Link href={`/app/chatbots/${chatbotId}?tab=playground`} className={buttonVariants({ variant: "outline" })}>
             New conversation
@@ -118,8 +118,12 @@ export function PlaygroundChat({
                 )}
               >
                 <div className="flex items-center justify-between gap-1">
-                  <Link href={`/app/chatbots/${chatbotId}?tab=playground&conversation=${conversation.id}`} className="min-w-0 flex-1 hover:underline">
-                    <span className="block truncate">{conversation.title}</span>
+                  <Link
+                    href={`/app/chatbots/${chatbotId}?tab=playground&conversation=${conversation.id}`}
+                    className="min-w-0 flex-1 break-words hover:underline"
+                    title={conversation.title}
+                  >
+                    <span className="block line-clamp-2 leading-5">{conversation.title}</span>
                   </Link>
                   <ConversationTitleControl key={`${conversation.id}-${conversation.title}`} chatbotId={chatbotId} conversationId={conversation.id} title={conversation.title} />
                 </div>

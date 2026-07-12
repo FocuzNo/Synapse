@@ -36,6 +36,25 @@ export async function getConversationsForChatbot(chatbotId: string): Promise<Con
   );
 }
 
+export async function hasAssistantResponseForChatbot(chatbotId: string): Promise<boolean> {
+  const conversations = await getConversationsForChatbot(chatbotId);
+  if (conversations.length === 0) return false;
+
+  const supabase = await createServerSupabaseClient();
+  const { count, error } = await supabase
+    .from("messages")
+    .select("id", { count: "exact", head: true })
+    .in("conversation_id", conversations.map((conversation) => conversation.id))
+    .eq("role", "assistant");
+
+  if (error) {
+    console.error("Failed to check assistant responses", { code: error.code, chatbotId });
+    return false;
+  }
+
+  return (count ?? 0) > 0;
+}
+
 export async function getConversationWithMessages(
   chatbotId: string,
   conversationId: string | null
