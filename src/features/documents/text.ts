@@ -16,14 +16,13 @@ export function sanitizeFilename(filename: string) {
     .replace(/[^\w.\- ]+/g, "")
     .trim()
     .replace(/\s+/g, "-")
-    .toLowerCase()
-    .slice(0, 120);
+    .toLowerCase();
+  const base = normalized.endsWith(".txt")
+    ? normalized.slice(0, -4)
+    : normalized;
+  const safeBase = (base || "document").slice(0, 116).replace(/[.\- ]+$/, "");
 
-  if (!normalized.endsWith(".txt")) {
-    return `${normalized || "document"}.txt`;
-  }
-
-  return normalized || "document.txt";
+  return `${safeBase || "document"}.txt`;
 }
 
 function containsBinaryContent(bytes: Uint8Array) {

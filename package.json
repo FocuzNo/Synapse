@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test src/lib/utils.test.ts src/features/documents/text.test.ts src/features/billing/logic.test.ts",
+    "test": "tsx --test src/lib/utils.test.ts src/features/billing/logic.test.ts src/features/chatbots/schemas.test.ts src/features/documents/text.test.ts src/features/rag/formatting.test.ts src/features/widget/logic.test.ts",
     "verify:integrations": "tsx scripts/verify-integrations.ts",
     "supabase:status": "supabase status",
     "supabase:push": "supabase db push"
