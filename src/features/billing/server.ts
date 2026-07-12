@@ -5,6 +5,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getCurrentWorkspace } from "@/features/workspaces/server";
 import {
   calculateUsagePercentage,
+  canAccessAnalyticsOnPlan,
+  canCreateChatbotOnPlan,
+  canRemoveBrandingOnPlan,
+  canUploadDocumentOnPlan,
   isConversationRetainedAt,
 } from "@/features/billing/logic";
 import { getPlanDefinition, getPlanLabel, getPlanLimits } from "@/features/billing/plans";
@@ -153,7 +157,7 @@ export async function assertCanCreateChatbot(currentCount: number): Promise<Bill
   const plan = await getWorkspacePlan();
   const limits = getPlanLimits(plan);
 
-  if (currentCount >= limits.maxChatbots) {
+  if (!canCreateChatbotOnPlan(plan, currentCount)) {
     return billingError(
       "PLAN_LIMIT_REACHED",
       `${getPlanLabel(plan)} allows ${limits.maxChatbots} chatbot${limits.maxChatbots === 1 ? "" : "s"}. ${getPlanDefinition(plan).key === "pro" ? "Archive an existing chatbot before creating another one." : getPlanLabel(plan) === "Free" ? "Upgrade to Starter to add more assistants." : "Upgrade to Pro to add more assistants."}`
@@ -172,9 +176,10 @@ export async function assertCanUploadDocument(
 > {
   const plan = await getWorkspacePlan();
   const limits = getPlanLimits(plan);
-  const maxBytes = limits.maxFileSizeMb * 1024 * 1024;
 
-  if (currentDocumentCount >= limits.maxDocuments) {
+  const documentGate = canUploadDocumentOnPlan(plan, currentDocumentCount, fileSizeBytes);
+
+  if (!documentGate.ok && documentGate.code === "DOCUMENT_LIMIT_REACHED") {
     return {
       ok: false,
       code: "DOCUMENT_LIMIT_REACHED",
@@ -182,7 +187,7 @@ export async function assertCanUploadDocument(
     };
   }
 
-  if (fileSizeBytes > maxBytes) {
+  if (!documentGate.ok && documentGate.code === "FILE_TOO_LARGE") {
     return {
       ok: false,
       code: "FILE_TOO_LARGE",
@@ -195,9 +200,8 @@ export async function assertCanUploadDocument(
 
 export async function assertCanRemoveBranding() {
   const plan = await getWorkspacePlan();
-  const limits = getPlanLimits(plan);
 
-  if (!limits.brandingRemoval) {
+  if (!canRemoveBrandingOnPlan(plan)) {
     return billingError(
       "FEATURE_NOT_AVAILABLE",
       "Remove AskFlow branding by upgrading to Starter or Pro."
@@ -209,9 +213,8 @@ export async function assertCanRemoveBranding() {
 
 export async function assertCanAccessAnalytics() {
   const plan = await getWorkspacePlan();
-  const limits = getPlanLimits(plan);
 
-  if (!limits.analytics) {
+  if (!canAccessAnalyticsOnPlan(plan)) {
     return billingError(
       "FEATURE_NOT_AVAILABLE",
       "Analytics are available on Starter and Pro."

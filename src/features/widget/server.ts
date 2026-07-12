@@ -1,5 +1,4 @@
 import "server-only";
-import { createHash } from "node:crypto";
 import type { NextRequest } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getPublicRateLimitSalt } from "@/lib/env/server";
@@ -19,11 +18,17 @@ import {
   retrieveRelevantSourcesForChatbot,
   type RetrievedSource,
 } from "@/features/rag/retrieval";
+import { shouldUseKnowledgeFallback } from "@/features/rag/formatting";
 import type {
   PublicAnswerSource,
   PublicChatMessage,
   PublicChatbotConfig,
 } from "@/features/widget/types";
+import {
+  buildPublicRateLimitKeys,
+  mapPublicAnswerSources,
+  mapPublicChatbotConfig,
+} from "@/features/widget/logic";
 
 const PUBLIC_CHATBOT_SELECT =
   "id,workspace_id,public_id,name,welcome_message,system_prompt,status,primary_color,theme,position,branding_enabled";
@@ -58,21 +63,13 @@ function getClientIp(request: NextRequest) {
   );
 }
 
-function hashRateLimitKey(value: string) {
-  return createHash("sha256")
-    .update(getPublicRateLimitSalt())
-    .update(":")
-    .update(value)
-    .digest("hex");
-}
-
 export function getPublicRateLimitKeys(request: NextRequest, chatbotPublicId: string, sessionId: string) {
-  const hashedIp = hashRateLimitKey(getClientIp(request));
-
-  return {
-    sessionKey: `widget:${chatbotPublicId}:session:${sessionId}`,
-    ipKey: `widget:${chatbotPublicId}:ip:${hashedIp}`,
-  };
+  return buildPublicRateLimitKeys({
+    clientIp: getClientIp(request),
+    chatbotPublicId,
+    sessionId,
+    salt: getPublicRateLimitSalt(),
+  });
 }
 
 export async function resolveAvailablePublicChatbot(publicId: string) {
@@ -110,16 +107,7 @@ export async function getPublicChatbotConfig(publicId: string): Promise<PublicCh
     return null;
   }
 
-  return {
-    publicId: chatbot.public_id,
-    name: chatbot.name,
-    welcomeMessage: chatbot.welcome_message,
-    primaryColor: chatbot.primary_color,
-    theme: chatbot.theme,
-    position: chatbot.position,
-    brandingEnabled: chatbot.branding_enabled,
-    available: true,
-  };
+  return mapPublicChatbotConfig(chatbot);
 }
 
 export async function checkWidgetRateLimits(params: {
@@ -293,7 +281,7 @@ export async function saveWidgetMessageSources(
   assistantMessageId: string,
   sources: RetrievedSource[]
 ) {
-  if (sources.length === 0) {
+  if (shouldUseKnowledgeFallback(sources)) {
     return;
   }
 
@@ -331,44 +319,7 @@ export async function getPublicSourcesForMessage(
     return [];
   }
 
-  return (data ?? [])
-    .map((row, index) => {
-      const typed = row as unknown as {
-        document_chunks:
-          | {
-              content: string;
-              documents:
-                | { original_filename: string }
-                | { original_filename: string }[]
-                | null;
-            }
-          | {
-              content: string;
-              documents:
-                | { original_filename: string }
-                | { original_filename: string }[]
-                | null;
-            }[]
-          | null;
-      };
-      const chunk = Array.isArray(typed.document_chunks)
-        ? typed.document_chunks[0]
-        : typed.document_chunks;
-      const document = Array.isArray(chunk?.documents)
-        ? chunk?.documents[0]
-        : chunk?.documents;
-
-      if (!chunk) {
-        return null;
-      }
-
-      return {
-        sourceNumber: index + 1,
-        filename: document?.original_filename ?? "Document",
-        excerpt: chunk.content.trim().slice(0, 180),
-      } satisfies PublicAnswerSource;
-    })
-    .filter((source): source is PublicAnswerSource => Boolean(source));
+  return mapPublicAnswerSources(data ?? []);
 }
 
 export async function getWidgetConversationHistory(params: {

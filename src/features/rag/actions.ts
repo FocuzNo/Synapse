@@ -12,6 +12,7 @@ import { getChatbotById } from "@/features/chatbots/queries";
 import { getReadyDocumentCount } from "@/features/documents/queries";
 import { retrieveRelevantSources } from "@/features/rag/retrieval";
 import { generateGroundedAnswer } from "@/features/rag/generate";
+import { shouldUseKnowledgeFallback } from "@/features/rag/formatting";
 import {
   RAG_FALLBACK,
   RAG_PROVIDER_ERROR_FALLBACK,
@@ -222,7 +223,7 @@ export async function askPlaygroundQuestionAction(input: unknown): Promise<Actio
   let inputTokens: number | null = null;
   let outputTokens: number | null = null;
 
-  if (sources.length > 0) {
+  if (!shouldUseKnowledgeFallback(sources)) {
     try {
       const generated = await generateGroundedAnswer({
         chatbotPrompt: chatbot.system_prompt,

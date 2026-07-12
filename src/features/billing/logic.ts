@@ -20,6 +20,37 @@ export function canRemoveBrandingOnPlan(plan: PlanKey) {
   return getPlanLimits(plan).brandingRemoval;
 }
 
+export function canAccessAnalyticsOnPlan(plan: PlanKey) {
+  return getPlanLimits(plan).analytics;
+}
+
+export function canCreateChatbotOnPlan(plan: PlanKey, currentCount: number) {
+  return currentCount < getPlanLimits(plan).maxChatbots;
+}
+
+export function canUploadDocumentOnPlan(
+  plan: PlanKey,
+  currentDocumentCount: number,
+  fileSizeBytes: number
+) {
+  const limits = getPlanLimits(plan);
+  const maxBytes = limits.maxFileSizeMb * 1024 * 1024;
+
+  if (currentDocumentCount >= limits.maxDocuments) {
+    return { ok: false as const, code: "DOCUMENT_LIMIT_REACHED" as const };
+  }
+
+  if (fileSizeBytes > maxBytes) {
+    return { ok: false as const, code: "FILE_TOO_LARGE" as const };
+  }
+
+  return { ok: true as const };
+}
+
+export function canSendMessageOnPlan(plan: PlanKey, currentMonthlyMessages: number) {
+  return currentMonthlyMessages < getPlanLimits(plan).maxMonthlyMessages;
+}
+
 export function calculateUsagePercentage(used: number, limit: number) {
   if (limit <= 0) {
     return 0;

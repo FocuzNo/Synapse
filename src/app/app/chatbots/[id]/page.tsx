@@ -18,6 +18,7 @@ import { getWorkspacePlanLimits } from "@/features/billing/server";
 import { getChatbotById } from "@/features/chatbots/queries";
 import { getConversationWithMessages, getConversationsForChatbot } from "@/features/conversations/queries";
 import { getDocumentsForChatbot, getReadyDocumentCount } from "@/features/documents/queries";
+import { buildWidgetEmbedCode } from "@/features/widget/logic";
 import { cn } from "@/lib/utils";
 
 const tabs = [
@@ -65,7 +66,10 @@ export default async function ChatbotDetailPage({
       ? await getConversationWithMessages(chatbot.id, query.conversation ?? null)
       : null;
   const appUrl = getServerEnv().NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
-  const embedCode = `<script\n  src="${appUrl}/widget.js"\n  data-chatbot-id="${chatbot.public_id}"\n  async>\n</script>`;
+  const embedCode = buildWidgetEmbedCode({
+    appUrl,
+    publicId: chatbot.public_id,
+  });
 
   return (
     <section className="space-y-6">
